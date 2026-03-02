@@ -368,22 +368,22 @@ def create_pdf_for_group(dosen, mata_kuliah, kelas, df_group, output_buffer,
     elements.append(PageBreak())
     elements.append(Paragraph("Komentar", ps('KomTitle', fontSize=11, fontName='Helvetica-Bold', spaceAfter=0.3*cm)))
 
+    # Cari kolom yang mengandung "komentar"
     komentar_col = None
     for col in df_group.columns:
-        if "komentar" in col.lower() or "saran" in col.lower():
+        if "komentar" in col.lower():
             komentar_col = col
             break
 
     if komentar_col:
-        komentar_list = df_group[komentar_col].dropna().tolist()
-        idx = 1
-        for k in komentar_list:
-            k = str(k).strip()
-            if k:
-                elements.append(Paragraph(f"{idx}. {k}", ps(f'K{idx}', fontSize=9, leading=12)))
-                idx += 1
+        for idx, k in enumerate(df_group[komentar_col], 1):
+            if pd.notna(k) and str(k).strip():
+                k_str = str(k).strip()
+            else:
+                k_str = "-"
+            elements.append(Paragraph(f"{idx}. {k_str}", ps(f'K{idx}', fontSize=9, leading=12)))
     else:
-        elements.append(Paragraph("Tidak ada komentar.", ps('NoKom', fontSize=9)))
+        elements.append(Paragraph("Tidak ada kolom komentar ditemukan.", ps('NoKom', fontSize=9)))
 
     pdf.build(elements)
     output_buffer.seek(0)
@@ -399,8 +399,32 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    st.success(f"✅ CSV berhasil dimuat! Total {len(df)} baris data")
+    # Try baca CSV dengan beberapa encoding dan separator
+    encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+    separators = [',', ';', '\t', '|']  # comma, semicolon, tab, pipe
+    df = None
+    last_error = None
+
+    # Reset file pointer untuk setiap percobaan
+    uploaded_file.seek(0)
+    content = uploaded_file.read()
+
+    for enc in encodings:
+        for sep in separators:
+            try:
+                uploaded_file.seek(0)
+                df = pd.read_csv(uploaded_file, encoding=enc, sep=sep)
+                if len(df.columns) > 1:  # Valid jika lebih dari 1 kolom
+                    st.success(f"✅ CSV berhasil dimuat! (Encoding: {enc}, Separator: '{sep}') Total {len(df)} baris data")
+                    break
+            except Exception:
+                continue
+        if df is not None and len(df.columns) > 1:
+            break
+
+    if df is None or len(df.columns) <= 1:
+        st.error("❌ Gagal membaca CSV. Format tidak dikenali.")
+        st.info("Pastikan file CSV menggunakan pemisah koma (,) atau semicolon (;)")
 
     with st.expander("👁️ Preview Data", expanded=False):
         st.dataframe(df, use_container_width=True, height=300)
