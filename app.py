@@ -63,19 +63,15 @@ CATEGORIES = {
 }
 
 SCORE_MAP = {
-    "Baik Sekali": 4,
     "baik sekali": 4,
-    "Baik": 3,
     "baik": 3,
-    "Cukup": 2,
     "cukup": 2,
-    "Kurang": 1,
     "kurang": 1,
 }
 
 
 def get_score(val):
-    return SCORE_MAP.get(str(val).strip(), 0)
+    return SCORE_MAP.get(str(val).strip().lower(), 0)
 
 
 def find_question_col(df_cols, keyword):
