@@ -153,7 +153,7 @@ def create_pdf_for_group(dosen, mata_kuliah, kelas, df_group, output_buffer,
 
         c.setFont("Helvetica-BoldOblique", 8)
         c.drawCentredString(PAGE_W / 2, PAGE_H - MT - 1.85*cm,
-                            "Program Studi : Bhs. INGGRIS – Bhs. PRANCIS – Bhs. JERMAN – Bhs. JEPANG")
+                            "Program Studi : Sastra. INGGRIS – Sastra. PRANCIS – Sastra. JERMAN – Sastra. JEPANG")
 
         c.setFont("Helvetica", 7.5)
         c.drawCentredString(PAGE_W / 2, PAGE_H - MT - 2.25*cm,
