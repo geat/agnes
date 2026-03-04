@@ -12,6 +12,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
 import zipfile
 import os
 
@@ -113,14 +114,87 @@ def create_pdf_for_group(dosen, mata_kuliah, kelas, df_group, output_buffer,
                           semester="", judul="", prodi="", teknik="", platform=""):
     """Buat PDF sesuai format hasil.pdf"""
 
-    pdf = SimpleDocTemplate(
+    BLUE = colors.HexColor("#4472C4")
+
+    # ---- FUNGSI GAMBAR KOP DI SETIAP HALAMAN ----
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path  = os.path.join(script_dir, "logo.png")
+    PAGE_W, PAGE_H = A4
+    ML = 1.5*cm   # margin kiri
+    MR = 1.5*cm   # margin kanan
+    MT = 1.5*cm   # margin atas
+    LINE_W = PAGE_W - ML - MR   # lebar garis = lebar konten
+
+    def draw_kop(c, doc):
+        c.saveState()
+
+        # ── Logo (jika ada) ────────────────────────────────────────────────
+        logo_w = logo_h = 2.2*cm
+        text_x = ML  # default tanpa logo
+
+        if os.path.exists(logo_path):
+            logo_x = ML
+            logo_y = PAGE_H - MT - logo_h
+            c.drawImage(logo_path, logo_x, logo_y,
+                        width=logo_w, height=logo_h,
+                        preserveAspectRatio=True, mask='auto')
+            text_x = ML + logo_w + 0.3*cm
+
+        # ── Teks kop ────────────────────────────────────────────────────────
+        c.setFillColor(BLUE)
+
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(PAGE_W / 2, PAGE_H - MT - 0.7*cm,
+                            "SEKOLAH TINGGI BAHASA ASING")
+
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredString(PAGE_W / 2, PAGE_H - MT - 1.35*cm,
+                            "Y  A  P  A  R  I")
+
+        c.setFont("Helvetica-BoldOblique", 8)
+        c.drawCentredString(PAGE_W / 2, PAGE_H - MT - 1.85*cm,
+                            "Program Studi : Bhs. INGGRIS – Bhs. PRANCIS – Bhs. JERMAN – Bhs. JEPANG")
+
+        c.setFont("Helvetica", 7.5)
+        c.drawCentredString(PAGE_W / 2, PAGE_H - MT - 2.25*cm,
+                            "Kampus : Jl. Cihampelas 194 Bandung 40131  |  Telp. (022) 2035426  |  WA 087822127474")
+        c.drawCentredString(PAGE_W / 2, PAGE_H - MT - 2.6*cm,
+                            "Website : www.stbayapariaba.ac.id  –  E-mail : info@stba.ac.id")
+
+        # ── Dua garis biru mepet (tebal atas, tipis bawah) ─────────────────
+        c.setStrokeColor(BLUE)
+        y_top = PAGE_H - MT - 3.0*cm
+        y_bot = y_top - 3          # jarak 3pt antar garis
+
+        c.setLineWidth(2.5)
+        c.line(ML, y_top, PAGE_W - MR, y_top)
+
+        c.setLineWidth(1.0)
+        c.line(ML, y_bot, PAGE_W - MR, y_bot)
+
+        c.restoreState()
+
+    # ── Hitung tinggi kop agar konten mulai di bawah garis ─────────────────
+    KOP_HEIGHT = MT + 3.1*cm   # ruang yang dipakai kop dari atas halaman
+
+    pdf = BaseDocTemplate(
         output_buffer,
         pagesize=A4,
-        rightMargin=1.5*cm,
-        leftMargin=1.5*cm,
-        topMargin=1.5*cm,
+        rightMargin=MR,
+        leftMargin=ML,
+        topMargin=KOP_HEIGHT,     # konten mulai di bawah kop
         bottomMargin=1.5*cm
     )
+
+    frame = Frame(
+        ML, 1.5*cm,
+        LINE_W,
+        PAGE_H - KOP_HEIGHT - 1.5*cm,
+        id='normal'
+    )
+    pdf.addPageTemplates([
+        PageTemplate(id='kop', frames=[frame], onPage=draw_kop)
+    ])
 
     elements = []
     styles = getSampleStyleSheet()
@@ -129,7 +203,6 @@ def create_pdf_for_group(dosen, mata_kuliah, kelas, df_group, output_buffer,
     def ps(name, **kwargs):
         return ParagraphStyle(name, parent=styles['Normal'], **kwargs)
 
-    inst_style = ps('Inst', fontSize=16, fontName='Helvetica-Bold', alignment=1, leading=20)
     title_style = ps('Title', fontSize=11, fontName='Helvetica-Bold', alignment=1, spaceAfter=0.2*cm)
     label_style = ps('Label', fontSize=9, fontName='Helvetica-Bold')
     value_style = ps('Value', fontSize=9, fontName='Helvetica')
@@ -137,32 +210,10 @@ def create_pdf_for_group(dosen, mata_kuliah, kelas, df_group, output_buffer,
     item_style  = ps('Item', fontSize=8, fontName='Helvetica', leading=10)
     avg_bold    = ps('AvgBold', fontSize=8, fontName='Helvetica-Bold')
 
-    # ---- HEADER ----
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    logo_path = os.path.join(script_dir, "logo.png")
-
-    if os.path.exists(logo_path):
-        logo_img = Image(logo_path, width=1.8*cm, height=1.8*cm)
-        header_data = [[logo_img, Paragraph("SEKOLAH TINGGI BAHASA ASING YAPARI BANDUNG", inst_style)]]
-        header_table = Table(header_data, colWidths=[2*cm, 15*cm])
-    else:
-        header_data = [[Paragraph("SEKOLAH TINGGI BAHASA ASING YAPARI BANDUNG", inst_style)]]
-        header_table = Table(header_data, colWidths=[17*cm])
-
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(header_table)
-    elements.append(create_hline(17*cm, 1.5))
-    elements.append(Spacer(1, 0.2*cm))
-
     # ---- TITLE ----
     doc_title = judul if judul else "KUESIONER PROSES PEMBELAJARAN"
     elements.append(Paragraph(doc_title, title_style))
-    elements.append(Spacer(1, 0.3*cm))
+    elements.append(Spacer(1, 0.15*cm))
 
     # ---- INFO TABLE (2-column layout) ----
     def info_row(lbl, val):
